@@ -10,6 +10,7 @@ import "../src/implants/failSafeImplant.sol";
 contract borgScript is Script {
     borgCore public core;
     BorgAuth public auth;
+    SignatureHelper helper;
     failSafeImplant failSafe;
     IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
     address public weth = 0x4200000000000000000000000000000000000006;
@@ -26,6 +27,9 @@ contract borgScript is Script {
 
         auth = new BorgAuth(); 
         core = new borgCore(auth, 0x3, _mode, _identifier, address(safe));
+        helper = new SignatureHelper();
+
+        core.setSignatureHelper(helper);
 
         // Whitelist WETH contract methods
         // TODO: Combine into updatePolicy()
@@ -80,7 +84,88 @@ contract borgScript is Script {
             604800 // 1 week
         );
 
+        // Set guard to assimilate safe
+        bytes memory guardData = abi.encodeWithSignature("setGuard(address)", address(core));
+        GnosisTransaction memory guardTxData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
+        executeData(guardTxData.to, 0, guardTxData.data);
+
+        // Implant recovery module
+        failSafe = new failSafeImplant(auth, address(safe), executor);
+        bytes memory failsafeData = abi.encodeWithSignature("enableModule(address)", address(core));
+        GnosisTransaction memory failsafeTxData = GnosisTransaction({to: address(safe), value: 0, data: failsafeData}); 
+        executeData(failsafeTxData.to, 0, failsafeTxData.data);
+
         vm.stopBroadcast();
+    }
+
+    function executeData(
+        address to,
+        uint8 operation,
+        bytes memory data
+    ) public {
+        uint256 value = 0;
+        uint256 safeTxGas = 0;
+        uint256 baseGas = 0;
+        uint256 gasPrice = 0;
+        address gasToken = address(0);
+        address refundReceiver = address(0);
+        uint256 nonce = safe.nonce();
+        bytes memory signature = getSignature(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            nonce
+        );
+        vm.prank(executor);
+        safe.execTransaction(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            signature
+        );
+    }
+
+    function getSignature(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 nonce
+    ) public view returns (bytes memory) {
+        bytes memory txHashData = safe.encodeTransactionData(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            nonce
+        );
+
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerPrivateKey, keccak256(txHashData));
+        bytes memory signature = abi.encodePacked(r, s, v);
+        return signature;
     }
 
 }
