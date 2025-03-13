@@ -27,6 +27,29 @@ contract borgScript is Script {
         auth = new BorgAuth(); 
         core = new borgCore(auth, 0x3, _mode, _identifier, address(safe));
 
+        // Whitelist WETH contract methods
+        // TODO: Combine into updatePolicy()
+        // Add two unsigned integer range parameter constraints for approve and transfer, and two exact matches for the address parameter
+        core.addUnsignedRangeParameterConstraint(
+            weth,
+            "approve(address,uint256)",
+            borgCore.ParamType.UINT,
+            0,
+            999999999999999999, // Maximum < 1 Ether
+            36,
+            32
+        );
+
+        core.addUnsignedRangeParameterConstraint(
+            weth,
+            "transfer(address,uint256)",
+            borgCore.ParamType.UINT,
+            0,
+            999999999999999999, // Maximum < 1 Ether
+            36,
+            32
+        );
+
         vm.stopBroadcast();
     }
 
