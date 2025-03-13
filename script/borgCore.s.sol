@@ -68,6 +68,17 @@ contract borgScript is Script {
             20
         );
 
+        core.updateMethodCooldown(
+            weth,
+            "approve(address,uint256)",
+            604800 // 1 week
+        );
+
+        core.updateMethodCooldown(
+            weth,
+            "transfer(address,uint256)",
+            604800 // 1 week
+        );
 
         vm.stopBroadcast();
     }
