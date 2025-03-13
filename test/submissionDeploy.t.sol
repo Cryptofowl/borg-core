@@ -13,6 +13,7 @@ contract borgCoreScriptTest is Test {
     IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
     address public weth = 0x4200000000000000000000000000000000000006;
     address public executor = 0x400e942A08DCA906349d59957A5E6AA2856D3603;
+    address public guy = 0x341Da9fb8F9bD9a775f6bD641091b24Dd9aA459B;
 
     function setUp() public {
         script = new borgScript();
@@ -37,24 +38,114 @@ contract borgCoreScriptTest is Test {
             - Only be able to use the two whitelisted methods of the WETH contract
             - Only be able to transfer or approve to the whitelisted address
             - Only be able to transfer or approve the whitelisted amount
-            - Only allow the owner to change access controls
+            - Only be able to approve or transfer after the cooldown period
             - Be able to eject to the failsafe address
     */
-    function test_deployment() public {
+    function testDeployment() public {
         assertFalse(address(core) == address(0));
         assertFalse(address(auth) == address(0));
         assertFalse(address(helper) == address(0));
         assertFalse(address(failSafe) == address(0));
     }
-    function test_core() public {
+    function testCore() public {
         assertEq(auth.userRoles(executor), 99);
         assertEq(core.id(), "Submission Dev BORG");
         assertEq(uint256(core.borgMode()), uint256(borgCore.borgModes.whitelist));
         assertEq(address(core.helper()), address(helper));
     }
 
-    function test_transfer() public {
+    function testApprove(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+    }
 
+    function testFailApprove(uint256 amount) public {
+        vm.assume(amount > 1 ether);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        vm.expectRevert();
+        executeData(approveTx.to, 0, approveTx.data);
+    }
+
+    function testApproveCooldown(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        vm.warp(block.timestamp + 604800);
+        approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount + amount);
+    }
+
+    function testFailApproveCooldown(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        approveTx = getApproveData(weth, guy, amount); 
+        vm.expectRevert();
+        executeData(approveTx.to, 0, approveTx.data);
+    }
+
+    function testTransfer(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
+        executeData(transferTx.to, 0, transferTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+    }
+
+    function testFailTransfer(uint256 amount) public {
+        vm.assume(amount > 1 ether);
+        GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
+        vm.expectRevert();
+        executeData(transferTx.to, 0, transferTx.data);
+    }
+
+    function testTransferCooldown(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
+        executeData(transferTx.to, 0, transferTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        vm.warp(block.timestamp + 604800);
+        transferTx = getTransferData(weth, guy, amount);
+        executeData(transferTx.to, 0, transferTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount + amount);
+    }
+
+    function testFailTransferCooldown(uint256 amount) public {
+        vm.assume(amount < 1 ether);
+        GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
+        executeData(transferTx.to, 0, transferTx.data);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        transferTx = getTransferData(weth, guy, amount); 
+        vm.expectRevert();
+        executeData(transferTx.to, 0, transferTx.data);
+    }
+
+    function testFailUnauthorizedContract() public {
+
+    }
+
+    function getTransferData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes memory transferData = abi.encodeWithSignature(
+            "transfer(address,uint256)",
+            to,
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: token, value: 0, data: transferData});
+        return txData;
+    }
+
+    function getApproveData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes memory transferData = abi.encodeWithSignature(
+            "approve(address,uint256)",
+            to,
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: token, value: 0, data: transferData});
+        return txData;
     }
 
     function executeData(
@@ -81,7 +172,7 @@ contract borgCoreScriptTest is Test {
             refundReceiver,
             nonce
         );
-        vm.prank(owner);
+        vm.prank(executor);
         safe.execTransaction(
             to,
             value,
