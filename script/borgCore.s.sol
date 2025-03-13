@@ -31,6 +31,17 @@ contract borgScript is Script {
 
         core.setSignatureHelper(helper);
 
+        // Implant recovery module
+        failSafe = new failSafeImplant(auth, address(safe), executor);
+        bytes memory failsafeData = abi.encodeWithSignature("enableModule(address)", address(core));
+        GnosisTransaction memory failsafeTxData = GnosisTransaction({to: address(safe), value: 0, data: failsafeData}); 
+        executeData(failsafeTxData.to, 0, failsafeTxData.data);
+
+        // Set guard to assimilate safe
+        bytes memory guardData = abi.encodeWithSignature("setGuard(address)", address(core));
+        GnosisTransaction memory guardTxData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
+        executeData(guardTxData.to, 0, guardTxData.data);
+
         // Whitelist WETH contract methods
         // TODO: Combine into updatePolicy()
         // Add two unsigned integer range parameter constraints for approve and transfer, and two exact matches for the address parameter
@@ -84,17 +95,6 @@ contract borgScript is Script {
             604800 // 1 week
         );
 
-        // Set guard to assimilate safe
-        bytes memory guardData = abi.encodeWithSignature("setGuard(address)", address(core));
-        GnosisTransaction memory guardTxData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
-        executeData(guardTxData.to, 0, guardTxData.data);
-
-        // Implant recovery module
-        failSafe = new failSafeImplant(auth, address(safe), executor);
-        bytes memory failsafeData = abi.encodeWithSignature("enableModule(address)", address(core));
-        GnosisTransaction memory failsafeTxData = GnosisTransaction({to: address(safe), value: 0, data: failsafeData}); 
-        executeData(failsafeTxData.to, 0, failsafeTxData.data);
-
         vm.stopBroadcast();
     }
 
@@ -122,7 +122,6 @@ contract borgScript is Script {
             refundReceiver,
             nonce
         );
-        vm.prank(executor);
         safe.execTransaction(
             to,
             value,
