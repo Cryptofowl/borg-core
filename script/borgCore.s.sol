@@ -50,6 +50,25 @@ contract borgScript is Script {
             32
         );
 
+        core.addExactMatchParameterConstraint(
+            weth, 
+            "approve(address,uint256)",
+            borgCore.ParamType.ADDRESS,
+            matches,
+            16,
+            20
+        );
+
+        core.addExactMatchParameterConstraint(
+            weth, 
+            "transfer(address,uint256)",
+            borgCore.ParamType.ADDRESS,
+            matches,
+            16,
+            20
+        );
+
+
         vm.stopBroadcast();
     }
 
