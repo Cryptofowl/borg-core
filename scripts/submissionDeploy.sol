@@ -10,8 +10,8 @@ import "../src/implants/failSafeImplant.sol";
 contract borgScript is Script {
     borgCore public core;
     BorgAuth public auth;
-    SignatureHelper helper;
-    failSafeImplant failSafe;
+    SignatureHelper public helper;
+    failSafeImplant public failSafe;
     IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
     address public weth = 0x4200000000000000000000000000000000000006;
     address public executor = 0x400e942A08DCA906349d59957A5E6AA2856D3603;
@@ -32,8 +32,8 @@ contract borgScript is Script {
         core.setSignatureHelper(helper);
 
         // Implant recovery module
-        failSafe = new failSafeImplant(auth, address(safe), executor);
-        bytes memory failsafeData = abi.encodeWithSignature("enableModule(address)", address(core));
+        failSafe = new failSafeImplant(auth, address(safe), 0x68Ab3F79622cBe74C9683aA54D7E1BBdCAE8003C);
+        bytes memory failsafeData = abi.encodeWithSignature("enableModule(address)", address(failSafe));
         GnosisTransaction memory failsafeTxData = GnosisTransaction({to: address(safe), value: 0, data: failsafeData}); 
         executeData(failsafeTxData.to, 0, failsafeTxData.data);
 
