@@ -148,8 +148,24 @@ contract borgCoreScriptTest is Test {
         executeRevertData(approveTx.to, 0, approveTx.data);
     }
 
+    function testRevertUnauthorizedMethod() public {
+        vm.warp(block.timestamp + 604800);
+        GnosisTransaction memory withdrawTx = GnosisTransaction({
+            to: weth, 
+            value: 0, 
+            data: abi.encodeWithSignature("withdraw(uint)", 1 ether)
+        });
+        executeRevertData(withdrawTx.to, 0, withdrawTx.data);
+    }
+
+    function testRevertUnauthorizedReceiver(address recipient) public {
+        vm.assume(recipient != guy);
+        vm.warp(block.timestamp + 604800);
+        GnosisTransaction memory approveTx = getApproveData(weth, recipient, 0.5 ether);
+        executeRevertData(approveTx.to, 0, approveTx.data);
+    }
+
     function testSafeModule() public {
-        // Normally I would add the method to the interface, but for the purposes of the assessment I will avoid altering other files
         (bool success, bytes memory data) = address(safe).call(
             abi.encodeWithSignature("isModuleEnabled(address)", address(failSafe))); 
         bool module = abi.decode(data, (bool));
