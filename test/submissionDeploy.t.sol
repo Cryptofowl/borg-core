@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../scripts/submissionDeploy.sol";
 
 contract borgCoreScriptTest is Test {
+
     borgScript public script;
     borgCore public core;
     BorgAuth public auth;
@@ -24,6 +25,10 @@ contract borgCoreScriptTest is Test {
         helper = script.helper();
         failSafe = script.failSafe();
         safe = script.safe();
+        vm.deal(address(safe), 115792089237316195423570985008687907853269984665640564039457584007913129639935);
+        vm.prank(address(safe));
+        (bool success, ) = weth.call{value: 115792089237316195423570985008687907853269984665640563039457584007913129639935}(abi.encodeWithSignature("deposit()"));
+        require(success, "WETH deposit failed");
     }
 
     /*
@@ -42,6 +47,7 @@ contract borgCoreScriptTest is Test {
             - Only be able to approve or transfer after the cooldown period
             - Be able to eject to the failsafe address
     */
+
     function testDeployment() public {
         assertFalse(address(core) == address(0));
         assertFalse(address(auth) == address(0));
@@ -57,89 +63,106 @@ contract borgCoreScriptTest is Test {
 
     function testApprove(uint256 amount) public {
         vm.assume(amount < 1 ether);
+        vm.warp(block.timestamp + 604800);
         GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
         executeData(approveTx.to, 0, approveTx.data);
         assertEq(IERC20(weth).allowance(address(safe), guy), amount);
     }
 
-    function testFailApprove(uint256 amount) public {
+    function testRevertApprove(uint256 amount) public {
         vm.assume(amount > 1 ether);
         GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
-        vm.expectRevert();
-        executeData(approveTx.to, 0, approveTx.data);
+        executeRevertData(approveTx.to, 0, approveTx.data);
     }
 
     function testApproveCooldown(uint256 amount) public {
-        vm.assume(amount < 1 ether);
+        vm.assume(amount < 1 ether - 1);
+        vm.warp(block.timestamp + 604800);
         GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
         executeData(approveTx.to, 0, approveTx.data);
         assertEq(IERC20(weth).allowance(address(safe), guy), amount);
-        vm.warp(block.timestamp + 604800);
-        approveTx = getApproveData(weth, guy, amount);
+        vm.warp(block.timestamp + 1209600);
+        approveTx = getApproveData(weth, guy, amount + 1);
         executeData(approveTx.to, 0, approveTx.data);
-        assertEq(IERC20(weth).allowance(address(safe), guy), amount + amount);
+        assertEq(IERC20(weth).allowance(address(safe), guy), amount + 1);
     }
 
-    function testFailApproveCooldown(uint256 amount) public {
+    function testRevertApproveCooldown(uint256 amount) public {
         vm.assume(amount < 1 ether);
+        vm.warp(block.timestamp + 604800);
         GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
         executeData(approveTx.to, 0, approveTx.data);
         assertEq(IERC20(weth).allowance(address(safe), guy), amount);
         approveTx = getApproveData(weth, guy, amount); 
-        vm.expectRevert();
-        executeData(approveTx.to, 0, approveTx.data);
+        executeRevertData(approveTx.to, 0, approveTx.data);
     }
 
     function testTransfer(uint256 amount) public {
         vm.assume(amount < 1 ether);
+        vm.assume(IERC20(weth).balanceOf(address(safe)) > amount);
+        vm.warp(block.timestamp + 604800);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
         GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
         executeData(transferTx.to, 0, transferTx.data);
-        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        assertEq(IERC20(weth).balanceOf(guy), amount);
     }
 
-    function testFailTransfer(uint256 amount) public {
+    function testRevertTransfer(uint256 amount) public {
         vm.assume(amount > 1 ether);
         GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
-        vm.expectRevert();
-        executeData(transferTx.to, 0, transferTx.data);
+        executeRevertData(transferTx.to, 0, transferTx.data);
     }
 
     function testTransferCooldown(uint256 amount) public {
         vm.assume(amount < 1 ether);
+        vm.assume(IERC20(weth).balanceOf(address(safe)) > amount * 2);
+        vm.warp(block.timestamp + 604800);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
         GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
         executeData(transferTx.to, 0, transferTx.data);
-        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
-        vm.warp(block.timestamp + 604800);
+        vm.warp(block.timestamp + 1209600);
+        approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
         transferTx = getTransferData(weth, guy, amount);
         executeData(transferTx.to, 0, transferTx.data);
-        assertEq(IERC20(weth).allowance(address(safe), guy), amount + amount);
+        assertEq(IERC20(weth).balanceOf(guy), amount + amount);
     }
 
-    function testFailTransferCooldown(uint256 amount) public {
+    function testRevertTransferCooldown(uint256 amount) public {
         vm.assume(amount < 1 ether);
+        vm.warp(block.timestamp + 604800);
+        GnosisTransaction memory approveTx = getApproveData(weth, guy, amount);
+        executeData(approveTx.to, 0, approveTx.data);
         GnosisTransaction memory transferTx = getTransferData(weth, guy, amount);
         executeData(transferTx.to, 0, transferTx.data);
-        assertEq(IERC20(weth).allowance(address(safe), guy), amount);
+        assertEq(IERC20(weth).balanceOf(guy), amount);
         transferTx = getTransferData(weth, guy, amount); 
-        vm.expectRevert();
-        executeData(transferTx.to, 0, transferTx.data);
+        executeRevertData(transferTx.to, 0, transferTx.data);
     }
 
-    function testFailUnauthorizedContract() public {
+    function testRevertUnauthorizedContract() public {
+        vm.warp(block.timestamp + 604800);
         GnosisTransaction memory approveTx = getApproveData(dai, guy, 1 ether);
-        vm.expectRevert();
-        executeData(approveTx.to, 0, approveTx.data);
+        executeRevertData(approveTx.to, 0, approveTx.data);
     }
 
-    function testFailsafeModule() public {
+    function testSafeModule() public {
         // Normally I would add the method to the interface, but for the purposes of the assessment I will avoid altering other files
         (bool success, bytes memory data) = address(safe).call(
-            abi.encodeWithSignature("isModuleEnabled(address)", address(failSafe))
-        ); 
+            abi.encodeWithSignature("isModuleEnabled(address)", address(failSafe))); 
+        bool module = abi.decode(data, (bool));
+        assertTrue(module);
         assertTrue(success);
     }
 
-    function getTransferData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+    function testOwner() public {
+        assertEq(auth.userRoles(executor), 99);
+        assertEq(auth.userRoles(msg.sender), 0);
+    }
+
+    function getTransferData(address token, address to, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes memory transferData = abi.encodeWithSignature(
             "transfer(address,uint256)",
             to,
@@ -149,7 +172,7 @@ contract borgCoreScriptTest is Test {
         return txData;
     }
 
-    function getApproveData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getApproveData(address token, address to, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes memory transferData = abi.encodeWithSignature(
             "approve(address,uint256)",
             to,
@@ -184,6 +207,46 @@ contract borgCoreScriptTest is Test {
             nonce
         );
         vm.prank(executor);
+        safe.execTransaction(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            signature
+        );
+    }
+
+    function executeRevertData(
+        address to,
+        uint8 operation,
+        bytes memory data
+    ) public {
+        uint256 value = 0;
+        uint256 safeTxGas = 0;
+        uint256 baseGas = 0;
+        uint256 gasPrice = 0;
+        address gasToken = address(0);
+        address refundReceiver = address(0);
+        uint256 nonce = safe.nonce();
+        bytes memory signature = getSignature(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            nonce
+        );
+        vm.prank(executor);
+        vm.expectRevert();
         safe.execTransaction(
             to,
             value,

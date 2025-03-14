@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import "../test/libraries/safe.t.sol";
 import "../src/borgCore.sol";
 import "../src/libs/auth.sol";
@@ -83,6 +83,7 @@ contract borgScript is Script {
             20
         );
 
+        // Update cooldowns
         core.updateMethodCooldown(
             weth,
             "approve(address,uint256)",
@@ -94,6 +95,10 @@ contract borgScript is Script {
             "transfer(address,uint256)",
             604800 // 1 week
         );
+
+        // Transfer ownership to executor
+        auth.updateRole(executor, 99);
+        auth.zeroOwner();
 
         vm.stopBroadcast();
     }
