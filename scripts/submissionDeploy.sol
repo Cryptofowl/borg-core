@@ -12,7 +12,7 @@ contract borgScript is Script {
     BorgAuth public auth;
     SignatureHelper public helper;
     failSafeImplant public failSafe;
-    IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
+    IGnosisSafe public safe = IGnosisSafe(0x3dffF2e1471bB027788911944bBb34f335cC3557);
     address public weth = 0x4200000000000000000000000000000000000006;
     address public executor = 0x3690c931C92B78b4a1d09977feBa72ED2dC5e29D;
     function setUp() public {}

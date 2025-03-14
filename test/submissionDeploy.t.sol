@@ -11,7 +11,7 @@ contract borgCoreScriptTest is Test {
     BorgAuth public auth;
     failSafeImplant failSafe;
     SignatureHelper helper;
-    IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
+    IGnosisSafe public safe = IGnosisSafe(0x3dffF2e1471bB027788911944bBb34f335cC3557);
     address public weth = 0x4200000000000000000000000000000000000006;
     address public executor = 0x3690c931C92B78b4a1d09977feBa72ED2dC5e29D;
     address public guy = 0x341Da9fb8F9bD9a775f6bD641091b24Dd9aA459B;
