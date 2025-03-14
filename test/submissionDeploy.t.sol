@@ -13,7 +13,7 @@ contract borgCoreScriptTest is Test {
     SignatureHelper helper;
     IGnosisSafe public safe = IGnosisSafe(0x9a72ec2F0FF9e8c1e640e8F163B45A6f8E31F764);
     address public weth = 0x4200000000000000000000000000000000000006;
-    address public executor = 0x400e942A08DCA906349d59957A5E6AA2856D3603;
+    address public executor = 0x3690c931C92B78b4a1d09977feBa72ED2dC5e29D;
     address public guy = 0x341Da9fb8F9bD9a775f6bD641091b24Dd9aA459B;
     address public dai = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
 
@@ -160,6 +160,14 @@ contract borgCoreScriptTest is Test {
     function testOwner() public {
         assertEq(auth.userRoles(executor), 99);
         assertEq(auth.userRoles(msg.sender), 0);
+    }
+
+    function testRecoverSafeFunds() public {
+        vm.startPrank(executor);
+        failSafe.addToken(weth, 0, 115792089237316195423570985008687907853269984665640563039457584007913129639935, 0);
+        failSafe.recoverSafeFunds();
+        vm.stopPrank();
+        assertEq(IERC20(weth).balanceOf(address(executor)), 115792089237316195423570985008687907853269984665640563039457584007913129639935);
     }
 
     function getTransferData(address token, address to, uint256 amount) public pure returns (GnosisTransaction memory) {
