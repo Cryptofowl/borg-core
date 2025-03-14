@@ -43,7 +43,6 @@ contract borgScript is Script {
         executeData(guardTxData.to, 0, guardTxData.data);
 
         // Whitelist WETH contract methods
-        // TODO: Combine into updatePolicy()
         // Add two unsigned integer range parameter constraints for approve and transfer, and two exact matches for the address parameter
         core.addUnsignedRangeParameterConstraint(
             weth,
